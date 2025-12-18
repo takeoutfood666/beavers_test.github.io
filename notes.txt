@@ -1,0 +1,296 @@
+---------------------- questions during class ----------------------
+16.4b -> I only show the ships that have been sunk in a way I like. Do I need to show which haven't been sunk? If so, any hints or tips?
+
+---------------------- to do ----------------------
+
+possible optimalization:
+x | combine createEnemySea and createMySea into one function with parameters
+x | add shorter document.getElementById("id") function to use
+x | generalize the placeShip() function and reuse it in placeEnemyShip() function using parameters
+x | combine createFriendlyGridSquare() and createEnemyGridSquare() into on function with parameters
+x | add function that picks a random place on the grid for the computer
+
+Bugs:
+[FIXED] 16.3 sometimes I can only see 4 boats or less on the grid they either overlap or weren't placed
+
+---------------------- exercise 16.1  ----------------------
+
+Which code is executed when the program starts?
+the function "createMySea()" is called. It creates the sea of the player with the code:
+
+function createMySea(){
+    for (var rowNumber = 0; rowNumber < numRows; rowNumber++) {
+        for (columnNumber = 0; columnNumber < numRows; columnNumber++) {
+            var square = createFriendlyGridSquare(rowNumber, columnNumber)
+            square.draw(myContext)
+            mySquares.push(square)
+        }
+    }
+}
+----------------------
+Which code is executed when something is clicked?
+the function "gameSetupRound" is called. It checks if there's a square clicked and
+places a ship ("placeShip(i)") if there's ships left and if it's placable. When there 
+are no ships left, it creates the enemy sea ("createEnemySea()") and changes the onclick
+listeners:
+
+function gameSetupRound(clickEvent) {
+    mouseX = clickEvent.offsetX
+    mouseY = clickEvent.offsetY
+
+    /* Check to sea whether or not the click was on one of the squares */
+    for (var i = 0; i < mySquares.length; i++) {
+        if (mySquares[i].isClicked(mouseX, mouseY)) {
+            placeShip(i)
+            if(currentShipIndex == shipSizes.length){
+                createEnemySea()
+                /* Change the onclick listeners to start the game. */
+                document.getElementById("enemySea").onclick = playRound
+                document.getElementById("mySea").onclick = ""
+            }
+        }
+    }
+}
+----------------------
+What does the createMySea() function do?
+It loops trough all the rows and columns and creates a square variable with
+"createFriendlyGridSquare(rowNumber,columnNumber)" and draws the square and stores it
+in the (formerly empty) mySquares[] array:
+
+function createMySea(){
+    for (var rowNumber = 0; rowNumber < numRows; rowNumber++) {
+        for (columnNumber = 0; columnNumber < numRows; columnNumber++) {
+            var square = createFriendlyGridSquare(rowNumber, columnNumber)
+            square.draw(myContext)
+            mySquares.push(square)
+        }
+    }
+}
+----------------------
+After the program starts. How many elements are there in the mySquares array?
+There are 144 elements in the array (numbered 0-143).
+----------------------
+What is the difference between a square on the canvas and a square 
+in the mySquares array?
+A square on the canvas is drawn and doesn't hold any variables/ values. The squares
+in the mySquares array hold values and even methods.
+----------------------
+What does the createFriendlyGridSquare() function do?
+It creates a object called square and returns it:
+
+function createFriendlyGridSquare(rowNumber, columnNumber){
+    var square = {
+        rowNr: rowNumber,
+        columnNr: columnNumber,
+        state: "water",
+        getColor: mySeaColors,
+        draw: drawSquare,
+        changeState: changeSquareStateAndRedraw,
+        isClicked: coordinatesOverlap
+    }
+    return square
+}
+----------------------
+What does the changeSquareStateAndRedraw() function do? 
+Try to get it to do something by calling it (with the proper arguments) 
+in the console.
+The changeSquareStateAndRedraw() is a method and changes the "state" of a square
+(the possible states are found in mySeaColors() and enemySeaColors()) and redraws it:
+
+function changeSquareStateAndRedraw(newState,context) {
+    this.state = newState
+    this.draw(context)
+}
+
+and it can be used in the console for example by typing: 
+mySquares[1].changeState("ship",myContext) 
+----------------------
+When is the gameSetupRound() function called? What does the parameter do?
+The gameSetupRound() is called when the mySea canvas is clicked. The parameter
+clickEvent notes (used in code) the x and y coördinate of the "click event". 
+----------------------
+When is the playRound() function called?
+The playRound() function is called when a square is clicked and if there aren't any
+ships left to place on the grid and if the player clicks on the enemySea grid:
+
+function playRound(clickEvent){
+    mouseX = clickEvent.offsetX
+    mouseY = clickEvent.offsetY
+    playHumanTurn(mouseX,mouseY)
+    playComputerTurn()
+}
+----------------------
+What does the createEnemySea() function do? 
+How does it differ from the createMySea() function?
+It uses a for loop to go trough all the squares in the array. It uses 
+insertEnemyGameMethods(index) to "add" the methods to the array and it  then draws the
+"updated" square on the enemyContext
+
+function createEnemySea(){
+    for (rowNumber = 0; rowNumber < numRows; rowNumber++) {
+        for (columnNumber = 0; columnNumber < numRows; columnNumber++) {
+            var squareIndex = rowNumber * numColumns + columnNumber
+            insertEnemyGameMethods(squareIndex)
+            enemySquares[squareIndex].draw(enemyContext)
+        }
+    }
+}
+----------------------
+What does currentShipIndex represent?
+It is a global variable and represents the ammount of ships that have been placed
+on the grid by the player. Used to "begin" the game loop.
+----------------------
+Why do you think the maker of this assignment went through the trouble 
+of making the getSquareSize() function?
+It's used 3 times and it's easier than typing out a whole equasion + if you want to 
+change the canvas, you'll only need to change the gapSize and numRows.
+----------------------
+
+---------------------- exercise 16.3  ----------------------
+
+var enemySquares = [
+    { state: "water", rowNr:  0, columnNr:  0 },
+    { state: "water", rowNr:  0, columnNr:  1 },
+    { state: "water", rowNr:  0, columnNr:  2 },
+    { state: "water", rowNr:  0, columnNr:  3 },
+    { state: "water", rowNr:  0, columnNr:  4 },
+    { state: "water", rowNr:  0, columnNr:  5 },
+    { state: "water", rowNr:  0, columnNr:  6 },
+    { state: "water", rowNr:  0, columnNr:  7 },
+    { state: "water", rowNr:  0, columnNr:  8 },
+    { state: "water", rowNr:  0, columnNr:  9 },
+    { state: "water", rowNr:  0, columnNr: 10 },
+    { state: "water", rowNr:  0, columnNr: 11 },
+    { state: "water", rowNr:  1, columnNr:  0 },
+    { state: "water", rowNr:  1, columnNr:  1 },
+    { state: "water", rowNr:  1, columnNr:  2 },
+    { state: "water", rowNr:  1, columnNr:  3 },
+    { state: "ship",  rowNr:  1, columnNr:  4 },
+    { state: "ship",  rowNr:  1, columnNr:  5 },
+    { state: "ship",  rowNr:  1, columnNr:  6 },
+    { state: "water", rowNr:  1, columnNr:  7 },
+    { state: "water", rowNr:  1, columnNr:  8 },
+    { state: "water", rowNr:  1, columnNr:  9 },
+    { state: "water", rowNr:  1, columnNr: 10 },
+    { state: "water", rowNr:  1, columnNr: 11 },
+    { state: "water", rowNr:  2, columnNr:  0 },
+    { state: "water", rowNr:  2, columnNr:  1 },
+    { state: "water", rowNr:  2, columnNr:  2 },
+    { state: "water", rowNr:  2, columnNr:  3 },
+    { state: "water", rowNr:  2, columnNr:  4 },
+    { state: "water", rowNr:  2, columnNr:  5 },
+    { state: "water", rowNr:  2, columnNr:  6 },
+    { state: "water", rowNr:  2, columnNr:  7 },
+    { state: "water", rowNr:  2, columnNr:  8 },
+    { state: "water", rowNr:  2, columnNr:  9 },
+    { state: "water", rowNr:  2, columnNr: 10 },
+    { state: "water", rowNr:  2, columnNr: 11 },
+    { state: "water", rowNr:  3, columnNr:  0 },
+    { state: "water", rowNr:  3, columnNr:  1 },
+    { state: "water", rowNr:  3, columnNr:  2 },
+    { state: "water", rowNr:  3, columnNr:  3 },
+    { state: "water", rowNr:  3, columnNr:  4 },
+    { state: "water", rowNr:  3, columnNr:  5 },
+    { state: "water", rowNr:  3, columnNr:  6 },
+    { state: "water", rowNr:  3, columnNr:  7 },
+    { state: "water", rowNr:  3, columnNr:  8 },
+    { state: "water", rowNr:  3, columnNr:  9 },
+    { state: "water", rowNr:  3, columnNr: 10 },
+    { state: "water", rowNr:  3, columnNr: 11 },
+    { state: "water", rowNr:  4, columnNr:  0 },
+    { state: "water", rowNr:  4, columnNr:  1 },
+    { state: "water", rowNr:  4, columnNr:  2 },
+    { state: "ship",  rowNr:  4, columnNr:  3 },
+    { state: "ship",  rowNr:  4, columnNr:  4 },
+    { state: "ship",  rowNr:  4, columnNr:  5 },
+    { state: "ship",  rowNr:  4, columnNr:  6 },
+    { state: "ship",  rowNr:  4, columnNr:  7 },
+    { state: "water", rowNr:  4, columnNr:  8 },
+    { state: "water", rowNr:  4, columnNr:  9 },
+    { state: "water", rowNr:  4, columnNr: 10 },
+    { state: "water", rowNr:  4, columnNr: 11 },
+    { state: "water", rowNr:  5, columnNr:  0 },
+    { state: "water", rowNr:  5, columnNr:  1 },
+    { state: "water", rowNr:  5, columnNr:  2 },
+    { state: "water", rowNr:  5, columnNr:  3 },
+    { state: "water", rowNr:  5, columnNr:  4 },
+    { state: "water", rowNr:  5, columnNr:  5 },
+    { state: "water", rowNr:  5, columnNr:  6 },
+    { state: "water", rowNr:  5, columnNr:  7 },
+    { state: "water", rowNr:  5, columnNr:  8 },
+    { state: "water", rowNr:  5, columnNr:  9 },
+    { state: "water", rowNr:  5, columnNr: 10 },
+    { state: "water", rowNr:  5, columnNr: 11 },
+    { state: "water", rowNr:  6, columnNr:  0 },
+    { state: "water", rowNr:  6, columnNr:  1 },
+    { state: "ship",  rowNr:  6, columnNr:  2 },
+    { state: "ship",  rowNr:  6, columnNr:  3 },
+    { state: "water", rowNr:  6, columnNr:  4 },
+    { state: "ship",  rowNr:  6, columnNr:  5 },
+    { state: "ship",  rowNr:  6, columnNr:  6 },
+    { state: "ship",  rowNr:  6, columnNr:  7 },
+    { state: "water", rowNr:  6, columnNr:  8 },
+    { state: "water", rowNr:  6, columnNr:  9 },
+    { state: "water", rowNr:  6, columnNr: 10 },
+    { state: "water", rowNr:  6, columnNr: 11 },
+    { state: "water", rowNr:  7, columnNr:  0 },
+    { state: "water", rowNr:  7, columnNr:  1 },
+    { state: "water", rowNr:  7, columnNr:  2 },
+    { state: "water", rowNr:  7, columnNr:  3 },
+    { state: "water", rowNr:  7, columnNr:  4 },
+    { state: "water", rowNr:  7, columnNr:  5 },
+    { state: "water", rowNr:  7, columnNr:  6 },
+    { state: "water", rowNr:  7, columnNr:  7 },
+    { state: "water", rowNr:  7, columnNr:  8 },
+    { state: "water", rowNr:  7, columnNr:  9 },
+    { state: "water", rowNr:  7, columnNr: 10 },
+    { state: "water", rowNr:  7, columnNr: 11 },
+    { state: "water", rowNr:  8, columnNr:  0 },
+    { state: "water", rowNr:  8, columnNr:  1 },
+    { state: "water", rowNr:  8, columnNr:  2 },
+    { state: "water", rowNr:  8, columnNr:  3 },
+    { state: "water", rowNr:  8, columnNr:  4 },
+    { state: "water", rowNr:  8, columnNr:  5 },
+    { state: "water", rowNr:  8, columnNr:  6 },
+    { state: "water", rowNr:  8, columnNr:  7 },
+    { state: "water", rowNr:  8, columnNr:  8 },
+    { state: "water", rowNr:  8, columnNr:  9 },
+    { state: "water", rowNr:  8, columnNr: 10 },
+    { state: "water", rowNr:  8, columnNr: 11 },
+    { state: "water", rowNr:  9, columnNr:  0 },
+    { state: "water", rowNr:  9, columnNr:  1 },
+    { state: "water", rowNr:  9, columnNr:  2 },
+    { state: "ship",  rowNr:  9, columnNr:  3 },
+    { state: "ship",  rowNr:  9, columnNr:  4 },
+    { state: "ship",  rowNr:  9, columnNr:  5 },
+    { state: "ship",  rowNr:  9, columnNr:  6 },
+    { state: "water", rowNr:  9, columnNr:  7 },
+    { state: "water", rowNr:  9, columnNr:  8 },
+    { state: "water", rowNr:  9, columnNr:  9 },
+    { state: "water", rowNr:  9, columnNr: 10 },
+    { state: "water", rowNr:  9, columnNr: 11 },
+    { state: "water", rowNr: 10, columnNr:  0 },
+    { state: "water", rowNr: 10, columnNr:  1 },
+    { state: "water", rowNr: 10, columnNr:  2 },
+    { state: "water", rowNr: 10, columnNr:  3 },
+    { state: "water", rowNr: 10, columnNr:  4 },
+    { state: "water", rowNr: 10, columnNr:  5 },
+    { state: "water", rowNr: 10, columnNr:  6 },
+    { state: "water", rowNr: 10, columnNr:  7 },
+    { state: "water", rowNr: 10, columnNr:  8 },
+    { state: "water", rowNr: 10, columnNr:  9 },
+    { state: "water", rowNr: 10, columnNr: 10 },
+    { state: "water", rowNr: 10, columnNr: 11 },
+    { state: "water", rowNr: 11, columnNr:  0 },
+    { state: "water", rowNr: 11, columnNr:  1 },
+    { state: "water", rowNr: 11, columnNr:  2 },
+    { state: "water", rowNr: 11, columnNr:  3 },
+    { state: "water", rowNr: 11, columnNr:  4 },
+    { state: "water", rowNr: 11, columnNr:  5 },
+    { state: "water", rowNr: 11, columnNr:  6 },
+    { state: "water", rowNr: 11, columnNr:  7 },
+    { state: "water", rowNr: 11, columnNr:  8 },
+    { state: "water", rowNr: 11, columnNr:  9 },
+    { state: "water", rowNr: 11, columnNr: 10 },
+    { state: "water", rowNr: 11, columnNr: 11 }
+]

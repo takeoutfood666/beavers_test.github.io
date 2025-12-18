@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Battleships</title>
+    <style>
+        canvas {
+            margin-left: 10px;
+            background-color: #ccc;
+            border-top: 3px solid #ccc;
+            border-left: 3px solid #ccc;
+        }
+
+        #imageLost {
+            visibility: hidden;
+            height: 100%;
+            width: 100%;
+            position: absolute;
+        }
+
+        #imageWon {
+            visibility: hidden;
+            height: 100%;
+            width: 100%;
+            position: absolute;
+        }
+    </style>
+</head>
+
+<body>
+    <img id="imageLost" src="Battleship lost.png">
+    <img id="imageWon" src="Battleship won.png">
+    <canvas id="mySea" width=600 height=600></canvas>
+    <canvas id="enemySea" width=600 height=600></canvas>
+    <button id="toggleButton">Placing: Horizontally</button>
+    <div id="myFallenShips">These of your boats are hit: </div>
+    <div id="enemyFallenShips">These of your enemy's boats are hit: </div>
+    <div id="hint">Hint: this should be a useful hint</div>
+
+    <script>
+
+        /*---------------------- global variables ----------------------*/
+        var enemySquares = []
+        var mySquares = []
+
+        var myCanvas = document.getElementById("mySea")
+        var myContext = myCanvas.getContext("2d")
+
+        var enemyCanvas = document.getElementById("enemySea")
+        var enemyContext = enemyCanvas.getContext("2d")
+
+        var mySunkenShips = []
+        var enemySunkenShips = []
+
+        var timesWon = 0
+        var timesLost = 0
+
+        var gapSize = 3            /* pixels between each square  */
+        var numRows = 12           /* number of squares that fit in the canvas vertically  */
+        var numColumns = numRows   /* a sea always has equal length and width  */
+        var squareSize = getSquareSize()
+
+        var ships = [
+            { name: "Tiny Boat", length: 2 },
+            { name: "Big Boat", length: 5 },
+            { name: "Above Average Boat", length: 4 },
+            { name: "Below Average Boat1", length: 3 },
+            { name: "Below Average Boat2", length: 3 }
+        ]
+        var currentShipIndex = 0
+        var placingShipsHorizontally = true 
+
+        /*---------------------- small QOL functions ----------------------*/
+
+        // This function calcualates the size of a squares inside of a canvas.
+        function getSquareSize() {
+            var canvasWidth = myCanvas.width
+            var optimalSquareSize = (canvasWidth / numRows) - gapSize
+            return optimalSquareSize
+        }
+
+        // returns a random index from the grid 
+        function randomTargetIndex() {
+            return Math.floor(Math.random() * numRows * numRows)
+        }
+
+        // shorter version of "document.getElementById("")"
+        function getEl(id) {
+            return document.getElementById(id)
+        }
+
+        // toggle horizontal vs vertical placement, updates button HTML
+        function togglePlacingshipsHorizontally() {
+            if (placingShipsHorizontally) {
+                placingShipsHorizontally = false
+                getEl("toggleButton").innerHTML = "Placing: Vertically"
+            }
+            else {
+                placingShipsHorizontally = true
+                getEl("toggleButton").innerHTML = "Placing: Horizontally"
+            }
+        }
+
+        /*---------------------- squares functions and methods ----------------------*/
+
+        // function for creating squares
+        function createSquare(rowNumber, columnNumber, colors) {
+            var square = {
+                rowNr: rowNumber,
+                columnNr: columnNumber,
+                state: "water",
+                getColor: colors, // either mySeaColors or enemySeaColors, based on state
+                draw: drawSquare, // draws square on canvas
+                changeState: changeSquareStateAndRedraw,
+                isClicked: coordinatesOverlap // returns true if click coörds overlap in square
+            }
+            return square
+        }
+
+        // Method: draws a square on a canvas context.
+        function drawSquare(context) {
+            var x = this.columnNr * (squareSize + gapSize)
+            var y = this.rowNr * (squareSize + gapSize)
+            context.beginPath()
+            context.fillStyle = this.getColor()
+            context.rect(x, y, squareSize, squareSize)
+            context.fill()
+            context.font = "bold 10px sans-serif"
+            context.fillStyle = "rgba(255, 255, 255, 0.8)" /* semi-transparent white */
+            var squareIndex = this.rowNr * numColumns + this.columnNr
+            context.fillText(squareIndex, x + 5, y + 15)
+            /* TIP: you can add fillText commands here to show more info (such as state, // handy for exercise
+                    or ship name) in each square
+            */
+        }
+
+        // Method: changes the state of the square and redraws it.
+        function changeSquareStateAndRedraw(newState, context) {
+            this.state = newState
+            this.draw(context)
+        }
+
+        // Method: returns true if the given coordinates overlap the square.
+        function coordinatesOverlap(x, y) {
+            var squareX = this.columnNr * (squareSize + gapSize)
+            var squareY = this.rowNr * (squareSize + gapSize)
+            var fitsHorizontally = x >= squareX && x <= squareX + squareSize
+            var fitsVertically = y >= squareY && y <= squareY + squareSize
+            return fitsHorizontally && fitsVertically
+        }
+
+        // Method: In the player's sea, ships are yellow
+        function mySeaColors() {
+            if (this.state == "water") {
+                return "mediumslateblue"
+            } else if (this.state == "miss") {
+                return "lightcoral"
+            } else if (this.state == "hit") {
+                return "palegreen"
+            } else if (this.state == "ship") {
+                return "silver"
+            }
+        }
+
+        // Method: In the enemy sea, ships are blue (same as the sea)
+        function enemySeaColors() {
+            if (this.state == "water") {
+                return "darkslateblue"
+            } else if (this.state == "miss") {
+                return "crimson"
+            } else if (this.state == "hit") {
+                return "seagreen"
+            } else if (this.state == "ship") {
+                return "darkslateblue" // midnightblue for checking code. darkslateblue for playing
+            }
+        }
+
+        /*---------------------- gameplay functions ----------------------*/
+
+        // Function checks whether a ship is allowed to be placed on a certain starting position.
+        function isValidPosition(firstSquareIndex, currentShipSize, squares) {
+            var isValid = true
+
+            // checking for horizontally placed ships
+            if (placingShipsHorizontally) {
+                var colNr = squares[firstSquareIndex].columnNr
+                var numAvailableSquares1 = numColumns - colNr
+                if (numAvailableSquares1 < currentShipSize) { // check if placement on board is correct
+                    isValid = false
+                }
+                for (var i = firstSquareIndex; i < firstSquareIndex + currentShipSize; i++) { // overlap
+                    if (squares[i] != undefined && squares[i].state == "ship") {
+                        isValid = false
+                    }
+                }
+            }
+            // when the boats are place vertically
+            else {
+                var rowNr = squares[firstSquareIndex].rowNr
+                var numAvailableSquares2 = numRows - rowNr
+                if (numAvailableSquares2 < currentShipSize) { // check if placement on board is correct
+                    isValid = false
+                }
+                for (var i = firstSquareIndex; i < firstSquareIndex + (currentShipSize * numRows); i += numRows) { // overlap
+                    if (squares[i] != undefined && squares[i].state == "ship") { 
+                        isValid = false
+                    }
+                }
+            }
+            return isValid
+        }
+
+        // Place a ship, by changing the state of squares.
+        function placeShip(firstSquareIndex, squares, context) {
+            var currentShipSize = ships[currentShipIndex].length
+
+            // check if the position is valid 
+            if (isValidPosition(firstSquareIndex, currentShipSize, squares)) {
+                // place horizontally
+                if (placingShipsHorizontally) {
+                    for (var i = firstSquareIndex; i < firstSquareIndex + currentShipSize; i++) {
+                        squares[i].changeState("ship", context)
+                        squares[i].name = ships[currentShipIndex].name
+                    }
+                }
+                // place vertically
+                else {
+                    for (var i = firstSquareIndex; i < firstSquareIndex + (currentShipSize * numRows); i += numRows) {
+                        squares[i].changeState("ship", context)
+                        squares[i].name = ships[currentShipIndex].name
+                    }
+                }
+                currentShipIndex += 1
+            }
+        }
+
+        // Places the enemyShips on random locations
+        function placeEnemyShips() {
+            currentShipIndex = 0 // changes global variable!!
+            while (currentShipIndex < ships.length) {
+                var randomSquareIndex = randomTargetIndex()
+                var randomOrientation = Math.floor(Math.random() * 2) - 1 // generates either 0 or 1
+                placingShipsHorizontally = Boolean(randomOrientation)    // changes the orientation
+                placeShip(randomSquareIndex, enemySquares, enemyContext)
+            }
+        }
+
+        // creates and draws a sea
+        function createSea(colors, context, squares) {
+            for (var rowNumber = 0; rowNumber < numRows; rowNumber++) {
+                for (var columnNumber = 0; columnNumber < numRows; columnNumber++) {
+                    var square = createSquare(rowNumber, columnNumber, colors)
+                    square.draw(context)
+                    squares.push(square)
+                }
+            }
+        }
+
+        // function that checks if a ship is sunk
+        function sunkenShipUpdate(squares, hitIndex, side) {
+            var partsLeft = 0
+            var hitShipName = squares[hitIndex].name
+            // get the length of the named ship 
+            for (var i = 0; i < ships.length; i++) {
+                if (hitShipName == ships[i].name) {
+                    var shiplength = ships[i].length
+                }
+            }
+            // go trough the sea and find other sunken shipparts
+            for (var i = 0; i < squares.length; i++) {
+                if (hitShipName == squares[i].name) {
+                    if (squares[i].state == "ship") {
+                        partsLeft = shiplength - 1
+                    }
+                }
+            }
+            // checks if all parts have been sunk and updates HTML, checks if user won or lost
+            if (partsLeft == 0) {
+                showStateSunkenShips(hitShipName, side)
+                checkWinOrLose()
+            }
+        }
+
+        // checks if someone has won after hitting a ship. Updates global var timesLost and timesWon. Can be used later
+        function checkWinOrLose() {
+            // check if user has lost and shows lost-screen
+            if (mySunkenShips.length == ships.length) {
+                timesLost++ // use later
+                console.log("You have lost " + timesLost + " times.") // show if it works
+                getEl("imageLost").style.visibility = "visible"
+                getEl("imageLost").onclick = resetGame // resets the game after clicking on the screen
+            }
+            // check if user has won and shows winning-screen
+            else if (enemySunkenShips.length == ships.length) {
+                timesWon++ // use later
+                console.log("You have won " + timesWon + " times.") // show if it works
+                getEl("imageWon").style.visibility = "visible"
+                getEl("imageWon").onclick = resetGame // resets the game after clicking on the screen
+            }
+        }
+
+        // resets all global variables and redraws the canvas
+        function resetGame() {
+
+            getEl("imageLost").style.visibility = "hidden"
+            getEl("imageWon").style.visibility = "hidden"
+            getEl("myFallenShips").innerHTML = "These of your boats are hit: "
+            getEl("enemyFallenShips").innerHTML = "These of your enemy's boats are hit: "
+
+            myContext.clearRect(0, 0, 600, 600)
+            enemyContext.clearRect(0, 0, 600, 600)
+
+            enemySquares = []
+            mySquares = []
+
+            mySunkenShips = []
+            enemySunkenShips = []
+
+            currentShipIndex = 0
+            placingShipsHorizontally = true
+
+            createSea(mySeaColors, myContext, mySquares)
+            getEl("mySea").onclick = gameSetupRound
+            getEl("toggleButton").onclick = togglePlacingshipsHorizontally
+            getEl("hint").innerHTML = "Hint: place " + ships[currentShipIndex].name + " of length " + ships[currentShipIndex].length + "."
+        }
+
+        // function that shows the currently sunken ships
+        function showStateSunkenShips(shipName, side) {
+            if (side == "player") {
+                mySunkenShips.push(" " + shipName)
+                getEl("myFallenShips").innerHTML = "These of your boats are hit: " + mySunkenShips
+            } else if (side == "enemy") {
+                enemySunkenShips.push(" " + shipName)
+                getEl("enemyFallenShips").innerHTML = "These of your enemy's boats are hit: " + enemySunkenShips
+            }
+        }
+
+        //Plays a turn human turn based on x and y coordinates (coming from a click).
+        function playHumanTurn(mouseX, mouseY) {
+
+            for (var i = 0; i < enemySquares.length; i++) {
+                // check is square is clicked
+                if (enemySquares[i].isClicked(mouseX, mouseY)) {
+
+                    // stops user from bombing the same square twice
+                    if (enemySquares[i].state == "miss" || enemySquares[i].state == "hit") {
+                    }
+                    // changes square state from water -> miss, does computer turn
+                    else if (enemySquares[i].state == "water") {
+                        enemySquares[i].changeState("miss", enemyContext)
+                        playComputerTurn()
+                    }
+                    // changes square from ship -> hit, does computer turn
+                    else if (enemySquares[i].state == "ship") {
+                        enemySquares[i].changeState("hit", enemyContext)
+                        playComputerTurn()
+                        // checks if ship has been sunk after a hit
+                        sunkenShipUpdate(enemySquares, i, "enemy")
+                    }
+                }
+            }
+        }
+
+        // The computer throws a bomb at random location in your sea + updated ai
+        function playComputerTurn() {
+            // pick a random target
+            var targetIndex = randomTargetIndex()
+            // repicks random target if the first one has already been picked
+            while (mySquares[targetIndex].state == "miss" || mySquares[targetIndex].state == "hit") {
+                targetIndex = randomTargetIndex()
+            }
+
+            // changes state of water -> miss
+            if (mySquares[targetIndex].state == "water") {
+                mySquares[targetIndex].changeState("miss", myContext)
+            }
+            // changes state of ship -> hit, checks if ship has been sunk
+            else if (mySquares[targetIndex].state == "ship") {
+                mySquares[targetIndex].changeState("hit", myContext)
+                sunkenShipUpdate(mySquares, targetIndex, "player")
+            }
+        }
+
+        // function that allows the user to place ships and set up the game
+        function gameSetupRound(clickEvent) {
+            mouseX = clickEvent.offsetX
+            mouseY = clickEvent.offsetY
+
+            // Check to sea whether or not the click was on one of the squares
+            for (var i = 0; i < mySquares.length; i++) {
+
+                if (mySquares[i].isClicked(mouseX, mouseY)) {
+                    placeShip(i, mySquares, myContext)
+
+                    // change the hint after placing a ship
+                    if (currentShipIndex < ships.length) {
+                        getEl("hint").innerHTML = "Hint: place " + ships[currentShipIndex].name + " of length " + ships[currentShipIndex].length + "."
+                    }
+
+                    // check is all ships have been placed
+                    if (currentShipIndex == ships.length) {
+                        // changes the hint
+                        getEl("hint").innerHTML = "Hint: throw bomb in enemy sea."
+
+                        // creates the enemy sea + ship placements
+                        createSea(enemySeaColors, enemyContext, enemySquares)
+                        placeEnemyShips()
+
+                        // Change the onclick listeners + some HTML to start the game
+                        getEl("enemySea").onclick = playRound
+                        getEl("mySea").onclick = ""
+                        getEl("toggleButton").onclick = ""
+                        getEl("toggleButton").innerHTML = "Placing: Disabled"
+                    }
+                }
+            }
+        }
+        
+        // This is the actual game. Function is triggered with a clickEvent.
+        function playRound(clickEvent) {
+            mouseX = clickEvent.offsetX
+            mouseY = clickEvent.offsetY
+            playHumanTurn(mouseX, mouseY)
+        }
+
+        /*---------------------- "first run" code ----------------------*/
+
+        // create user sea and allow game setup
+        createSea(mySeaColors, myContext, mySquares)
+        getEl("mySea").onclick = gameSetupRound
+        getEl("toggleButton").onclick = togglePlacingshipsHorizontally
+        // displays first hint (first boat)
+        getEl("hint").innerHTML = "Hint: place " + ships[currentShipIndex].name + " of length " + ships[currentShipIndex].length + "."
+
+
+    </script>
+</body>
+
+</html>
